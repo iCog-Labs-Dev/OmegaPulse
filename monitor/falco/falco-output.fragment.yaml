@@ -1,0 +1,8 @@
+json_output: true
+buffered_outputs: false
+file_output:
+  enabled: false
+program_output:
+  enabled: true
+  keep_alive: true
+  program: "python3 -u /writer/event_writer.py"

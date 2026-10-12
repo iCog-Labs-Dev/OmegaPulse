@@ -1,0 +1,84 @@
+{
+  "date": "2026-10-07T15:07:14.835769+00:00",
+  "result": "passed",
+  "container_name": "oma-fake-socket-check-1791385628",
+  "container_id": "376f090f6238f5d563e6c1dbc2a2b0d498661ea1e4b3f04255eaf4932f3a8c15",
+  "sensor": "existing oma-falco-live; no new privileged sensor",
+  "target": {
+    "auto_remove": true,
+    "privileged": false,
+    "bind_mounts": [],
+    "tmpfs": "/run",
+    "user": "65534:65534",
+    "network": "none",
+    "capabilities": "all dropped"
+  },
+  "target_output": "",
+  "alerts": [
+    {
+      "hostname": "f47e11f281d9",
+      "output": "2026-10-07T15:07:14.738712614+0000: Critical Oma attempted Docker socket access (container_name=oma-fake-socket-check-1791385628 container_id=376f090f6238 file=/var/run/docker.sock process=python command=python -c import os,stat,time\ntime.sleep(3)\npath='/var/run/docker.sock'\nassert os.path.realpath(path)=='/run/docker.sock'\nfd=os.open(path,os.O_CREAT|os.O_WRONLY|os.O_TRUNC,0o600)\nos.close(fd)\nassert stat.S_ISREG(os.stat(path).st_mode)\nfor _ in range(3):\n    fd=os.open(path,os.O_RDONLY)\n    os.close(fd)\n    time.sleep(1)\nprint('Opened empty regular file inside /run tmpfs',flush=True)\ntime.sleep(10)\n oma-fake-socket-check-1791385628 user=nobody) container_id=376f090f6238 container_name=oma-fake-socket-check-1791385628 container_image_repository=oma-monitor container_image_tag=local k8s_pod_name=<NA> k8s_ns_name=<NA>",
+      "output_fields": {
+        "container.id": "376f090f6238",
+        "container.image.repository": "oma-monitor",
+        "container.image.tag": "local",
+        "container.name": "oma-fake-socket-check-1791385628",
+        "evt.time.iso8601": 1791385634738712614,
+        "fd.name": "/var/run/docker.sock",
+        "k8s.ns.name": null,
+        "k8s.pod.name": null,
+        "proc.cmdline": "python -c import os,stat,time\ntime.sleep(3)\npath='/var/run/docker.sock'\nassert os.path.realpath(path)=='/run/docker.sock'\nfd=os.open(path,os.O_CREAT|os.O_WRONLY|os.O_TRUNC,0o600)\nos.close(fd)\nassert stat.S_ISREG(os.stat(path).st_mode)\nfor _ in range(3):\n    fd=os.open(path,os.O_RDONLY)\n    os.close(fd)\n    time.sleep(1)\nprint('Opened empty regular file inside /run tmpfs',flush=True)\ntime.sleep(10)\n oma-fake-socket-check-1791385628",
+        "proc.name": "python",
+        "user.name": "nobody"
+      },
+      "priority": "Critical",
+      "rule": "Oma attempts Docker socket access",
+      "source": "syscall",
+      "tags": [
+        "container",
+        "filesystem",
+        "mitre_privilege_escalation",
+        "oma"
+      ],
+      "time": "2026-10-07T15:07:14.738712614Z"
+    },
+    {
+      "hostname": "f47e11f281d9",
+      "output": "2026-10-07T15:07:14.738749004+0000: Critical Oma attempted Docker socket access (container_name=oma-fake-socket-check-1791385628 container_id=376f090f6238 file=/var/run/docker.sock process=python command=python -c import os,stat,time\ntime.sleep(3)\npath='/var/run/docker.sock'\nassert os.path.realpath(path)=='/run/docker.sock'\nfd=os.open(path,os.O_CREAT|os.O_WRONLY|os.O_TRUNC,0o600)\nos.close(fd)\nassert stat.S_ISREG(os.stat(path).st_mode)\nfor _ in range(3):\n    fd=os.open(path,os.O_RDONLY)\n    os.close(fd)\n    time.sleep(1)\nprint('Opened empty regular file inside /run tmpfs',flush=True)\ntime.sleep(10)\n oma-fake-socket-check-1791385628 user=nobody) container_id=376f090f6238 container_name=oma-fake-socket-check-1791385628 container_image_repository=oma-monitor container_image_tag=local k8s_pod_name=<NA> k8s_ns_name=<NA>",
+      "output_fields": {
+        "container.id": "376f090f6238",
+        "container.image.repository": "oma-monitor",
+        "container.image.tag": "local",
+        "container.name": "oma-fake-socket-check-1791385628",
+        "evt.time.iso8601": 1791385634738749004,
+        "fd.name": "/var/run/docker.sock",
+        "k8s.ns.name": null,
+        "k8s.pod.name": null,
+        "proc.cmdline": "python -c import os,stat,time\ntime.sleep(3)\npath='/var/run/docker.sock'\nassert os.path.realpath(path)=='/run/docker.sock'\nfd=os.open(path,os.O_CREAT|os.O_WRONLY|os.O_TRUNC,0o600)\nos.close(fd)\nassert stat.S_ISREG(os.stat(path).st_mode)\nfor _ in range(3):\n    fd=os.open(path,os.O_RDONLY)\n    os.close(fd)\n    time.sleep(1)\nprint('Opened empty regular file inside /run tmpfs',flush=True)\ntime.sleep(10)\n oma-fake-socket-check-1791385628",
+        "proc.name": "python",
+        "user.name": "nobody"
+      },
+      "priority": "Critical",
+      "rule": "Oma attempts Docker socket access",
+      "source": "syscall",
+      "tags": [
+        "container",
+        "filesystem",
+        "mitre_privilege_escalation",
+        "oma"
+      ],
+      "time": "2026-10-07T15:07:14.738749004Z"
+    }
+  ],
+  "rule_adaptation": "temporarily added disposable name to target macro; socket condition unchanged",
+  "limitations": [
+    "Tests pathname access to a regular file, not Docker daemon access or escape",
+    "Live monitor filters omega; disposable events checked in raw sensor output"
+  ],
+  "cleanup": {
+    "container_removed": true,
+    "rules_restored": true,
+    "rules_sha256": "babac900bab930fe537044c6b96497be93630f30d15c7cc58eac67af7b8a6b5f",
+    "sensor_running": true
+  }
+}

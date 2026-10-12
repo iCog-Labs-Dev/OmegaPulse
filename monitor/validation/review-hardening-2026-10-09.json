@@ -1,0 +1,124 @@
+{
+  "date": "2026-10-09",
+  "reviewed_commit": "c06fc89",
+  "publication": "Local changes only; not committed or pushed",
+  "unit_tests": {
+    "python_3_12": {
+      "passed": 93,
+      "deselected_integration": 3,
+      "seconds": 12.56
+    },
+    "python_3_14": {
+      "passed": 93,
+      "deselected_integration": 3,
+      "seconds": 13.35
+    }
+  },
+  "actual_http_server": {
+    "result": "passed",
+    "admitted_streams": 8,
+    "additional_rejected_streams": 8,
+    "status_login_stop_responsive": true,
+    "threads": 16
+  },
+  "falco_rules_validation": "passed in Falco 0.45.0",
+  "native_falco": {
+    "result": "passed",
+    "rules": {
+      "Oma namespace or mount manipulation": 17,
+      "Oma outbound connection attempt": 3,
+      "Oma attempts Docker socket access": 3,
+      "Oma process environment access": 1,
+      "Oma process tracing attempt": 1,
+      "Unexpected shell or network utility in Oma": 1
+    },
+    "outbound_syscalls": [
+      "connect",
+      "sendmsg",
+      "sendto"
+    ],
+    "socket_syscalls": [
+      "connect",
+      "openat"
+    ],
+    "alternate_socket_path_detected": true,
+    "target_id": "e10da985a447e76d556316ca7d3fe5e042e2f441690781bbda6b3abe850294e6"
+  },
+  "native_socket_alerts": [
+    {
+      "time": "2026-10-09T19:46:25.872877276Z",
+      "rule": "Oma attempts Docker socket access",
+      "priority": "Critical",
+      "source": "syscall",
+      "output_fields": {
+        "container.id": "e10da985a447",
+        "container.name": "oma-review-check-1791575182984154412-target",
+        "syscall.type": "connect",
+        "fd.name": "ffff8f2d8d634380->ffff8f2efa30bf00 /run/docker.sock"
+      }
+    },
+    {
+      "time": "2026-10-09T19:46:25.872901082Z",
+      "rule": "Oma attempts Docker socket access",
+      "priority": "Critical",
+      "source": "syscall",
+      "output_fields": {
+        "container.id": "e10da985a447",
+        "container.name": "oma-review-check-1791575182984154412-target",
+        "syscall.type": "openat",
+        "fd.name": "/run/docker.sock"
+      }
+    },
+    {
+      "time": "2026-10-09T19:46:25.872918378Z",
+      "rule": "Oma attempts Docker socket access",
+      "priority": "Critical",
+      "source": "syscall",
+      "output_fields": {
+        "container.id": "e10da985a447",
+        "container.name": "oma-review-check-1791575182984154412-target",
+        "syscall.type": "connect",
+        "fd.name": "ffff8f2dd7940000->ffff8f2d8a4db600 /run/alternate/docker.sock"
+      }
+    }
+  ],
+  "kernel": "7.0.0-14-generic",
+  "monitor_image_build": "passed",
+  "sensor_image_build": "passed",
+  "constraints": {
+    "sudo_used": false,
+    "native_target_privileged": false,
+    "native_target_host_mounts": [],
+    "native_target_socket_directory": "container-only /run tmpfs",
+    "privileged_sensor": "explicitly approved"
+  },
+  "limitations": [
+    "Upstream Actions availability/approval and required-check protection need maintainer verification",
+    "Renamed executables and arbitrary socket filenames are not comprehensively identified",
+    "Admission limits bound SSE load, not arbitrary HTTP floods",
+    "Clients sharing an address share its login throttle",
+    "Retention is bounded by bytes/files, not a guaranteed time window",
+    "Docker cursor deduplication is bounded to 2000 distinct lines per timestamp second"
+  ],
+  "harness_corrections": [
+    "Preserved cached Python 3.14 MFA dependency path",
+    "Allowed executable temporary launcher stubs in Python 3.12 container",
+    "Used Docker socket GID observed from inside the runner (973)",
+    "Matched Falco shortened container IDs against full Docker IDs"
+  ],
+  "docker_integration": {
+    "passed": 3,
+    "seconds": 41.45,
+    "target": "disposable unprivileged lifecycle target; no live Oma controlled"
+  },
+  "native_rotation": {
+    "archive_count": 2,
+    "maximum_file_bytes": 19992,
+    "all_files_private": true
+  },
+  "restart_log_recovery": {
+    "result": "passed",
+    "method": "Existing open Docker stream recovered new startup marker with timestamp >= new State.StartedAt; old history excluded"
+  },
+  "cleanup": "Native sensors, --rm syscall targets, and disposable lifecycle targets removed; live Oma untouched"
+}

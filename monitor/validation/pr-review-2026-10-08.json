@@ -1,0 +1,58 @@
+{
+  "date": "2026-10-08",
+  "repository": "MilaBooot/OmegaPulse",
+  "branch": "feat/oma-monitor",
+  "pr": "https://github.com/iCog-Labs-Dev/OmegaPulse/pull/1",
+  "changes": [
+    "individual accounts and viewer/operator roles",
+    "server-side sessions and logout",
+    "persistent login limits",
+    "optional TOTP with replay rejection",
+    "timestamped size/time event rotation",
+    "validated environment-driven Falco target",
+    "PR unit-test workflow"
+  ],
+  "unit_tests": {
+    "python_3_12": {
+      "passed": 70,
+      "deselected_integration": 3,
+      "seconds": 7.6
+    },
+    "python_3_14": {
+      "passed": 70,
+      "deselected_integration": 3,
+      "seconds": 7.53
+    }
+  },
+  "docker_integration": {
+    "passed": 3,
+    "seconds": 41.41,
+    "target": "disposable review container; live Oma not controlled"
+  },
+  "real_http": {
+    "result": "passed",
+    "viewer_controls": 403,
+    "operator_controls": 200,
+    "logout_cookie_replay": 401
+  },
+  "standalone_monitor_build": "passed",
+  "rotation_sensor_image_build": "passed",
+  "falco_rendered_custom_target_validation": "passed",
+  "packaged_writer": {
+    "synthetic_records_preserved": 200,
+    "archive_count": 3,
+    "maximum_file_bytes": 20345,
+    "threshold_bytes": 20480,
+    "uid": 1000
+  },
+  "real_kernel_pipeline": "passed; see pr-review-kernel-2026-10-08.json",
+  "limitations": [
+    "Require monitor-unit-tests through organization repository branch protection; workflow alone cannot enforce merges",
+    "CI excludes opt-in privileged/real-Docker checks",
+    "Single writer per directory; records larger than threshold remain intact up to 1 MiB",
+    "Retention can remove unread archives",
+    "Manual browser visual interaction not asserted"
+  ],
+  "publication": "Prepared locally; no push or PR comment posted",
+  "original_pr_head": "5f02a2e6701f1a56f8779b1fee07b5e336334443"
+}

@@ -1,0 +1,81 @@
+# Render this template with python -m monitor.render_rules before loading it.
+
+- macro: oma_target_container
+  condition: container.name = __OMA_MONITOR_CONTAINER__
+
+- macro: oma_network_connection
+  condition: (syscall.type = connect or (syscall.type in (sendto, sendmsg, sendmmsg) and fd.l4proto = udp)) and (fd.typechar = 4 or fd.typechar = 6)
+
+- rule: Oma outbound connection attempt
+  desc: Report IPv4/IPv6 connect and datagram send attempts made by Oma.
+  condition: oma_target_container and oma_network_connection
+  output: >
+    Oma outbound connection attempt
+    (container_name=%container.name container_id=%container.id
+    syscall=%syscall.type process=%proc.name command=%proc.cmdline connection=%fd.name
+    user=%user.name)
+  priority: NOTICE
+  tags: [container, network, oma, mitre_command_and_control]
+
+- rule: Oma namespace or mount manipulation
+  desc: Report syscalls commonly involved in crossing isolation boundaries.
+  condition: >
+    oma_target_container and
+    syscall.type in (setns, unshare, mount, umount, umount2)
+  output: >
+    Oma namespace or mount manipulation
+    (container_name=%container.name container_id=%container.id
+    syscall=%syscall.type process=%proc.name command=%proc.cmdline
+    user=%user.name)
+  priority: WARNING
+  tags: [container, process, oma, mitre_privilege_escalation]
+
+- rule: Unexpected shell or network utility in Oma
+  desc: Report shells and common network tooling executed inside Oma.
+  condition: >
+    oma_target_container and
+    evt.type in (execve, execveat) and
+    proc.name in (bash, sh, dash, zsh, nc, ncat, netcat, socat, curl, wget)
+  output: >
+    Unexpected shell or network utility in Oma
+    (container_name=%container.name container_id=%container.id
+    process=%proc.name parent=%proc.pname command=%proc.cmdline
+    user=%user.name)
+  priority: WARNING
+  tags: [container, shell, network, oma, mitre_execution]
+
+- rule: Oma attempts Docker socket access
+  desc: Report open/connect attempts to paths named docker.sock, including alternate mount directories.
+  condition: >
+    oma_target_container and
+    evt.type in (open, openat, openat2, connect) and
+    (fd.name endswith /docker.sock or fd.name = docker.sock)
+  output: >
+    Oma attempted Docker socket access
+    (container_name=%container.name container_id=%container.id
+    syscall=%syscall.type file=%fd.name process=%proc.name command=%proc.cmdline user=%user.name)
+  priority: CRITICAL
+  tags: [container, filesystem, oma, mitre_privilege_escalation]
+
+
+- rule: Oma process tracing attempt
+  desc: Report ptrace attempts, which can inspect or alter another process.
+  condition: oma_target_container and syscall.type = ptrace
+  output: >
+    Oma process tracing attempt
+    (container_name=%container.name container_id=%container.id
+    process=%proc.name command=%proc.cmdline user=%user.name)
+  priority: WARNING
+  tags: [container, process, oma]
+
+- rule: Oma process environment access
+  desc: Report attempts to open proc process environment files, which can contain secrets.
+  condition: >
+    oma_target_container and evt.type in (open, openat, openat2) and
+    fd.name startswith /proc/ and fd.name endswith /environ
+  output: >
+    Oma process environment access
+    (container_name=%container.name container_id=%container.id
+    syscall=%syscall.type file=%fd.name process=%proc.name command=%proc.cmdline user=%user.name)
+  priority: WARNING
+  tags: [container, filesystem, oma]

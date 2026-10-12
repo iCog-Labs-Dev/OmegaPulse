@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-07",
+  "verified_pushed_tip": "b4314ca88941dd2cbeafbc6b6649b1154360f9ad",
+  "proposed_pr_scope": "monitor/",
+  "standalone_image_build": "passed",
+  "standalone_image_id": "sha256:e7871b2d90b8355ca6f658b9d2437103f068a2592f2564acba66b20b86adca60",
+  "regression": {
+    "passed": 44,
+    "skipped": 3,
+    "seconds": 0.46
+  },
+  "docker_and_combined_acceptance": {
+    "passed": 3,
+    "seconds": 41.95,
+    "target": "temporary disposable Python container; live Oma was not controlled"
+  },
+  "live_kernel_to_http_sse": {
+    "result": "passed",
+    "marker": "oma-monitor-check-1791382803",
+    "controlled_event_count": 3,
+    "container_id_match": "passed",
+    "source": "syscall",
+    "rules": [
+      "Unexpected shell or network utility in Oma",
+      "Oma outbound connection attempt",
+      "Oma namespace or mount manipulation"
+    ],
+    "verified_endpoints": [
+      "current user monitor on localhost:8765",
+      "rebuilt standalone monitor on localhost:18765"
+    ],
+    "redaction": "passed"
+  },
+  "live_sample": {
+    "outbound_notices": 280,
+    "nginx_outbound_notices": 257,
+    "interpretation": "alert-all prototype includes normal connections; not breach verdicts"
+  },
+  "limitations": [
+    "Docker-socket indicator skipped at user request",
+    "Prototype destination/process allowlists and production tuning deferred",
+    "Running state is not an agent-health assertion",
+    "Manual browser rendering of the rebuilt image was not checked"
+  ],
+  "cleanup": "Temporary review containers removed; live Oma/Falco/monitor preserved running",
+  "publication": "No commit, push, deployment, or PR performed"
+}

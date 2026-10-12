@@ -1,0 +1,116 @@
+{
+  "date": "2026-10-07",
+  "host": {
+    "os": "Ubuntu",
+    "kernel": "7.0.0-14-generic",
+    "architecture": "x86_64",
+    "docker_engine": "29.8.2"
+  },
+  "image": {
+    "tag": "omega:monitor-test",
+    "id": "sha256:ecdc0c47e95009485a8440c83347661f636300e9fd6951ac6aa95e9078d78eeb",
+    "size_bytes": 7929862199,
+    "dockerfile_modified": false,
+    "initial_build": "PyTorch download timed out",
+    "retry": "passed"
+  },
+  "sensor": {
+    "image": "falcosecurity/falco:0.45.0",
+    "digest": "sha256:788f1129c542171813083d4afc61b16730a47dde8c23d9c39370acef996349b6",
+    "engine": "modern_ebpf",
+    "container_plugin": "0.7.4",
+    "rules_validation": "passed",
+    "shutdown_detections": 122,
+    "shutdown_rule_counts": {
+      "Oma outbound connection attempt": 38,
+      "Oma namespace or mount manipulation": 76,
+      "Unexpected shell or network utility in Oma": 8
+    },
+    "drop_monitoring_occurrences": 0,
+    "drop_monitoring_actions": 0
+  },
+  "tests": {
+    "regression": {
+      "passed": 37,
+      "skipped": 3,
+      "seconds": 0.41
+    },
+    "docker_and_combined_acceptance": {
+      "passed": 3,
+      "seconds": 5.89
+    },
+    "native_http_sse": {
+      "result": "passed",
+      "container_id": "bc1cf2b49e09f84ea77bbd5af1693cd398374bffa13896a8a74a2053be0d0d53",
+      "raw_event_counts": {
+        "Oma namespace or mount manipulation": 76,
+        "Unexpected shell or network utility in Oma": 8,
+        "Oma outbound connection attempt": 34
+      },
+      "controlled_event_counts": {
+        "Unexpected shell or network utility in Oma": 1,
+        "Oma outbound connection attempt": 1,
+        "Oma namespace or mount manipulation": 1
+      },
+      "authenticated_sse_rules": [
+        "Oma namespace or mount manipulation",
+        "Oma outbound connection attempt",
+        "Unexpected shell or network utility in Oma"
+      ],
+      "redaction": "passed"
+    },
+    "docker_socket_indicator": "skipped at user request"
+  },
+  "oma_runtime": {
+    "connections": [
+      "Connected to: ('omega-mocks', 9765)",
+      "Connected to: ('omega-mocks', 9766)"
+    ],
+    "chars_sent_records": 51,
+    "latest_chars_sent": "8987",
+    "network_unreachable_errors": 0,
+    "tracebacks": 0
+  },
+  "controlled_indicators": {
+    "user": "65534:65534 (nobody)",
+    "outbound": "TCP connect to 127.0.0.1:9; connection refused",
+    "namespace": "libc unshare(CLONE_NEWNS); denied with errno 1",
+    "shell": "sh -c invoking the Python indicator script",
+    "marker": "oma-native-20261007",
+    "raw_event_source": "Falco file output; no fabricated events"
+  },
+  "controlled_events": [
+    {
+      "time": "2026-10-07T12:00:59.952801047Z",
+      "rule": "Unexpected shell or network utility in Oma",
+      "source": "syscall",
+      "priority": "Warning",
+      "container_name": "omega",
+      "container_id": "bc1cf2b49e09",
+      "output": "2026-10-07T12:00:59.952801047+0000: Warning Unexpected shell or network utility in Oma (container_name=omega container_id=bc1cf2b49e09 process=sh parent=containerd-shim command=sh -c python3 /tmp/oma-native-indicators.py oma-native-20261007 token=[REDACTED] user=nobody) container_id=bc1cf2b49e09 container_name=omega container_image_repository=omega container_image_tag=monitor-test k8s_pod_name=<NA> k8s_ns_name=<NA>"
+    },
+    {
+      "time": "2026-10-07T12:01:00.010514568Z",
+      "rule": "Oma outbound connection attempt",
+      "source": "syscall",
+      "priority": "Notice",
+      "container_name": "omega",
+      "container_id": "bc1cf2b49e09",
+      "output": "2026-10-07T12:01:00.010514568+0000: Notice Oma outbound connection attempt (container_name=omega container_id=bc1cf2b49e09 process=python3 command=python3 /tmp/oma-native-indicators.py oma-native-20261007 token=[REDACTED] connection=127.0.0.1:48344->127.0.0.1:9 user=nobody) container_id=bc1cf2b49e09 container_name=omega container_image_repository=omega container_image_tag=monitor-test k8s_pod_name=<NA> k8s_ns_name=<NA>"
+    },
+    {
+      "time": "2026-10-07T12:01:00.010875379Z",
+      "rule": "Oma namespace or mount manipulation",
+      "source": "syscall",
+      "priority": "Warning",
+      "container_name": "omega",
+      "container_id": "bc1cf2b49e09",
+      "output": "2026-10-07T12:01:00.010875379+0000: Warning Oma namespace or mount manipulation (container_name=omega container_id=bc1cf2b49e09 syscall=unshare process=python3 command=python3 /tmp/oma-native-indicators.py oma-native-20261007 token=[REDACTED] user=nobody) container_id=bc1cf2b49e09 container_name=omega container_image_repository=omega container_image_tag=monitor-test k8s_pod_name=<NA> k8s_ns_name=<NA>"
+    }
+  ],
+  "limitations": [
+    "Docker-socket indicator not executed",
+    "Browser visual rendering not manually checked",
+    "Short integration test does not establish production false-positive or dropped-event performance"
+  ]
+}

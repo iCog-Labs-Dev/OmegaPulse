@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>Oma monitor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='monitor.css') }}">
+  </head>
+  <body data-log-limit="{{ browser_log_limit }}">
+    <main>
+      <header>
+        <div>
+          <p class="eyebrow">Container monitor</p>
+          <h1>{{ container_name }}</h1>
+        </div>
+        <div><span>{{ username }}</span> <button id="logout" type="button">Log out</button></div>
+        <div id="status" class="status unknown" aria-live="polite">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="status-text">Checking Docker…</span>
+        </div>
+      </header>
+
+      <section class="notice" aria-label="Health interpretation">
+        “Running” is Docker process state only. It does not mean the Oma agent is healthy.
+      </section>
+
+      {% if can_control %}
+      <section class="controls" aria-labelledby="controls-heading">
+        <div>
+          <h2 id="controls-heading">Container controls</h2>
+          <span id="action-state" role="status">No action pending</span>
+        </div>
+        <div class="control-buttons">
+          <button id="start-container" type="button" data-action="start">Start</button>
+          <button id="stop-container" type="button" data-action="stop" class="danger">Stop</button>
+          <button id="restart-container" type="button" data-action="restart" class="danger">Restart</button>
+        </div>
+      </section>
+
+      {% endif %}
+      <section class="log-panel" aria-labelledby="logs-heading">
+        <div class="toolbar">
+          <div>
+            <h2 id="logs-heading">Live logs</h2>
+            <span id="connection-state">Connecting…</span>
+          </div>
+          <label>
+            <span>Filter</span>
+            <input id="filter" type="search" autocomplete="off" placeholder="Text in logs">
+          </label>
+          <button id="pause" type="button" aria-pressed="false">Pause</button>
+        </div>
+        <pre id="logs" tabindex="0" aria-label="Docker logs"></pre>
+      </section>
+
+      <section class="security-panel" aria-labelledby="security-heading">
+        <div class="toolbar">
+          <div>
+            <h2 id="security-heading">Runtime security signals</h2>
+            <span id="security-state">Checking detector…</span>
+          </div>
+          <button id="clear-security" type="button">Clear display</button>
+        </div>
+        <p class="notice">Signals describe attempts, not confirmed breaches. Outbound Notices include normal provider and Telegram connections.</p>
+        <div id="security-events" aria-live="polite"></div>
+      </section>
+    </main>
+    <script src="{{ url_for('static', filename='monitor.js') }}" defer></script>
+  </body>
+</html>

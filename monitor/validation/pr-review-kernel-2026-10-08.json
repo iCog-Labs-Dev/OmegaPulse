@@ -1,0 +1,26 @@
+{
+  "result": "passed",
+  "date": "2026-10-08",
+  "target": "oma-pr-kernel-target-1791468682",
+  "target_id": "60be85d8643f279329edbcdb40cfe302f434202d225be3b484ec1c29ac6b239b",
+  "sensor_engine": "modern_ebpf",
+  "rules": {
+    "Oma attempts Docker socket access": 2,
+    "Oma namespace or mount manipulation": 9,
+    "Oma outbound connection attempt": 150,
+    "Unexpected shell or network utility in Oma": 1
+  },
+  "source": "syscall",
+  "archive_count": 8,
+  "rotation_bytes": 20480,
+  "writer_uid": 1000,
+  "all_files_private_and_within_threshold": true,
+  "cleanup": "Temporary --rm sensor and target removed; live containers unchanged",
+  "target_constraints": {
+    "privileged": false,
+    "uid": 1000,
+    "host_mounts": [],
+    "tmpfs": "/run",
+    "real_docker_socket_mounted": false
+  }
+}

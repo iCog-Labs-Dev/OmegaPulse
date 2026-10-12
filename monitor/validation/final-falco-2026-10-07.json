@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-07",
+  "result": "passed within approved scope",
+  "marker": "oma-monitor-check-1791384930",
+  "sensor": {
+    "container": "oma-falco-live",
+    "engine": "modern_ebpf",
+    "privileged": true,
+    "action": "reused existing approved sensor; no additional sensor launched"
+  },
+  "target": {
+    "name": "omega",
+    "id": "57121bddabaddae3bbcb064ecd3eb9d0f142f6dafa34274f5d27c96477f09ad9",
+    "indicator_user": "65534:65534",
+    "lifecycle_changed": false
+  },
+  "kernel_capture": {
+    "source": "syscall",
+    "container_id_match": "passed",
+    "controlled_event_count": 3,
+    "rules": [
+      "Unexpected shell or network utility in Oma",
+      "Oma outbound connection attempt",
+      "Oma namespace or mount manipulation"
+    ],
+    "connect_result": "ConnectionRefusedError",
+    "unshare_result": "-1, errno 1"
+  },
+  "authenticated_http_sse": {
+    "endpoint": "running user monitor on localhost:8765",
+    "unauthenticated_status": 401,
+    "authenticated_target_state": "running",
+    "all_three_marked_rules_received": true,
+    "demo_token_redaction": "passed"
+  },
+  "regression": {"passed": 44, "skipped": 3, "seconds": 0.20},
+  "shell_syntax_and_diff_whitespace": "passed",
+  "limitations": [
+    "Docker-socket indicator remains skipped under earlier operator choice",
+    "Successful escape is not asserted",
+    "HTTP SSE verified; manual browser rendering not asserted",
+    "Short integration does not establish production false-positive/event-loss performance"
+  ]
+}
