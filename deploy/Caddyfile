@@ -1,0 +1,19 @@
+# TLS front for the monitor. The monitor stays on loopback; only Caddy is public.
+# PULSE_SITE is the public address, e.g. 202.181.159.188 or pulse.example.org.
+{
+	http_port 80
+	https_port {$PULSE_HTTPS_PORT}
+}
+
+https://{$PULSE_SITE}:{$PULSE_HTTPS_PORT} {
+	tls {
+		issuer acme {
+			# Let's Encrypt only issues IP-address certificates on the short-lived profile.
+			profile {$PULSE_ACME_PROFILE:classic}
+		}
+	}
+	reverse_proxy 127.0.0.1:{$OMA_MONITOR_PORT} {
+		# Pass log and event streams through as they arrive.
+		flush_interval -1
+	}
+}

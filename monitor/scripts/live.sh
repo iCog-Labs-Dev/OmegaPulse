@@ -51,7 +51,8 @@ if ! docker run --rm "${user_args[@]}" --entrypoint python oma-monitor:local -c 
     docker run --rm -it "${user_args[@]}" --entrypoint python oma-monitor:local -m monitor.users add "$username" --role operator
 fi
 export OMA_MONITOR_AUTH_DB=/auth/users.sqlite3 OMA_MONITOR_CONTAINER="$target" OMA_MONITOR_HOST=127.0.0.1
-export OMA_MONITOR_COOKIE_SECURE=false OMA_MONITOR_PORT="${OMA_MONITOR_PORT:-8765}"
+# Set OMA_MONITOR_COOKIE_SECURE=true when a TLS reverse proxy fronts this loopback port.
+export OMA_MONITOR_COOKIE_SECURE="${OMA_MONITOR_COOKIE_SECURE:-false}" OMA_MONITOR_PORT="${OMA_MONITOR_PORT:-8765}"
 export OMA_MONITOR_SECURITY_EVENTS_FILE=/events/oma-events.jsonl
 docker run --rm "${user_args[@]}" -e OMA_MONITOR_CONTAINER -e OMA_MONITOR_HOST \
     -e OMA_MONITOR_PORT -e OMA_MONITOR_COOKIE_SECURE --entrypoint python oma-monitor:local -c \
@@ -61,7 +62,7 @@ if docker container inspect "$container" >/dev/null 2>&1; then
     docker stop "$container" >/dev/null
     docker rename "$container" "$container-backup-$(date +%Y%m%d-%H%M%S)"
 fi
-docker run -d --name "$container" --label oma.monitor.component=monitor \
+docker run -d --name "$container" --restart unless-stopped --label oma.monitor.component=monitor \
     "${user_args[@]}" --group-add "$(stat -c '%g' /var/run/docker.sock)" \
     --network host --init --security-opt no-new-privileges:true \
     -e OMA_MONITOR_CONTAINER -e OMA_MONITOR_HOST -e OMA_MONITOR_PORT -e OMA_MONITOR_COOKIE_SECURE \
