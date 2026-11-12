@@ -1,0 +1,76 @@
+{
+  "base_commit": "3c226627c42203126d230ffcdaf478a24b1b486e",
+  "target": "oma-demo-target-20261112",
+  "native_priorities": {
+    "Notice": 3,
+    "Critical": 2,
+    "Warning": 4
+  },
+  "native_rules": {
+    "Oma outbound connection attempt": 3,
+    "Oma attempts Docker socket access": 2,
+    "Oma process environment access": 1,
+    "Oma process tracing attempt": 1,
+    "Oma namespace or mount manipulation": 1,
+    "Unexpected shell or network utility in Oma": 1
+  },
+  "guest_http": {
+    "/api/security/status": 401,
+    "/api/security/events": 401
+  },
+  "accounts": {
+    "demo-operator": {
+      "role": "operator",
+      "sse_priorities": [
+        "Critical",
+        "Notice",
+        "Warning"
+      ],
+      "control_buttons": true
+    },
+    "demo-viewer": {
+      "role": "viewer",
+      "sse_priorities": [
+        "Critical",
+        "Notice",
+        "Warning"
+      ],
+      "control_buttons": false,
+      "stop_http": 403
+    }
+  },
+  "critical_sample": [
+    {
+      "time": "2026-11-12T11:11:37.765510573Z",
+      "priority": "Critical",
+      "rule": "Oma attempts Docker socket access",
+      "source": "syscall",
+      "syscall": "connect",
+      "path": "ffff8a168a899200->ffff8a16a6daec00 /run/docker.sock"
+    },
+    {
+      "time": "2026-11-12T11:11:37.765535440Z",
+      "priority": "Critical",
+      "rule": "Oma attempts Docker socket access",
+      "source": "syscall",
+      "syscall": "openat",
+      "path": "/run/docker.sock"
+    }
+  ],
+  "result": "passed",
+  "date": "2026-11-12",
+  "scope": "Merged main verified using an isolated disposable target; no production Oma was started or controlled",
+  "target_constraints": {
+    "privileged": false,
+    "user": "1000:1000",
+    "network": "none",
+    "read_only": true,
+    "host_mounts": [],
+    "writable_path": "/run tmpfs only",
+    "real_docker_socket_mounted": false
+  },
+  "monitor_url": "http://127.0.0.1:8766",
+  "browser_visual_check": "Not automated; authenticated real HTTP/SSE checked; demo left running for operator inspection",
+  "demo_state": "Temporary sensor, monitor and target left running for requested browser demonstration; remove using local helper down",
+  "priority_interpretation": "Benign test syscalls triggered real Falco alerts; severity is a rule classification, not proof of compromise"
+}

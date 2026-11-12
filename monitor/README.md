@@ -22,6 +22,24 @@ application does not need to run as a privileged container. Each can be restarte
 independently. Docker controls and logs work without Falco; real syscall signals
 require a working Falco sensor.
 
+### Who can see security alerts
+
+Every authenticated viewer and operator sees the same runtime security signals,
+including Critical alerts. Only operators have Start/Stop/Restart permission.
+There is no separate web admin role or admin-only alert feed; signed-out visitors
+cannot read the security APIs. Host administrators manage accounts through the CLI.
+
+In **Runtime security signals**, each event displays its priority, rule, timestamp,
+and redacted details. Warning/Error events have an orange border;
+Critical/Alert/Emergency events have a red border. The bundled rules currently emit
+Notice, Warning, and Critical. There are no separate email/Telegram/push
+notifications or automatic containment actions.
+
+For a safe high-priority check, use a disposable target with a container-local fake
+Docker socket and the native test in [TESTING.md](TESTING.md). Never expose the real
+host socket to the target just to generate an alert. A harmless test can produce a
+real Critical alert: the priority identifies the rule, not a confirmed breach.
+
 ### What Falco watches and what access it has
 
 The rule template is [falco/oma_rules.yaml](falco/oma_rules.yaml). The launcher
@@ -152,29 +170,45 @@ credential environment variables. `OMA_MONITOR_AUTH_DIR` selects the Docker
 identity directory; `OMA_MONITOR_AUTH_DB` selects the Python process database.
 Protect the database and backups: they contain password hashes and MFA secrets.
 
-Optional authenticator-app MFA is enabled per account:
+### Mandatory two-step sign-in and Profile
 
-```bash
-bash monitor/scripts/live.sh users mfa alice
-```
+MFA is required for **every account**, including existing users and both roles.
+There is no password-only dashboard access and no web switch to disable MFA.
 
-MFA adds a second check if someone steals a password; it does not replace the
-password. To enroll:
+1. Enter your username and password on the first sign-in screen.
+2. If your account already has MFA, enter a fresh six-digit authenticator code
+   on the second screen. Otherwise scan the QR code (or enter the private setup
+   key) in a TOTP authenticator app and confirm a code to finish enrollment.
+3. Only after confirmation can you access the dashboard, APIs, or streams.
+   The password step expires after five minutes; start again if it expires.
 
-1. Run the command above, replacing `alice` with your account name.
-2. Add the printed private `otpauth://` URI to a TOTP authenticator app. For
-   manual setup, use the value after `secret=` and before the next `&` as the
-   key, choose time-based/TOTP, and use your username as the account label.
-3. Enter the app's current six-digit code at the terminal prompt. An arbitrary
-   six-digit number will not work. Each enrollment attempt generates a new
-   secret; use the URI from the latest attempt. Invalid confirmation leaves
-   the account's MFA configuration unchanged.
-4. Sign in with **username, password, and the current authenticator code**.
-   Do not leave the password empty. Accounts without MFA leave only the code
-   field empty. Reused login codes are rejected; wait for the next code when
-   signing in again. Keep phone/computer clocks synchronized if codes fail.
+HTTP clients must follow the returned `next` path and complete `/login/mfa`;
+a successful `/login` password response alone does not authorize APIs.
 
-Keep the enrollment URI/key private; it can generate your account's codes.
+Web codes are single use, with a one-step clock tolerance. A sign-in challenge
+is discarded after five incorrect codes, including attempts from different source
+addresses. Wait for the next code if
+one was just used to sign in or change security settings. Synchronize phone and
+server clocks if valid codes fail. Setup keys/QR codes are private credentials;
+do not share them, publish screenshots, or put them in logs. QR codes are rendered
+locally; no third-party QR service receives the setup key.
+
+Open **Profile** from the dashboard to see your username and role and:
+
+- **Change password:** enter your current password, an unused authenticator code,
+  and the new password twice (12–1024 characters). All your sessions are revoked
+  after success; sign in again with the new password and a fresh code.
+- **Replace authenticator:** verify your current password and an unused code from
+  the existing authenticator, scan the replacement QR, and confirm a code from
+  the new authenticator within five minutes. Reauthentication rotates the session
+  and CSRF token before showing the new key. The old authenticator remains active
+  until confirmation. Canceling/expiration leaves it unchanged. Confirmation
+  revokes all sessions; sign in again with a fresh code from the new authenticator.
+
+Both roles can manage their own password/MFA. Profile cannot create users or
+change roles. Administrators can still pre-enroll an account using
+`bash monitor/scripts/live.sh users mfa alice`, but web enrollment is the normal
+first-login flow. A verified setup code is consumed; wait for the next code to log in.
 
 ### Account recovery and administration
 
@@ -184,31 +218,38 @@ as the running Docker monitor. Replace `alice` with the account to manage:
 | Task | Command |
 | --- | --- |
 | Reset a forgotten password | `bash monitor/scripts/live.sh users password alice` |
-| Disable MFA after losing the authenticator | `bash monitor/scripts/live.sh users disable-mfa alice` |
-| Enroll a replacement authenticator | `bash monitor/scripts/live.sh users mfa alice` |
+| Reset MFA after losing the authenticator (forces re-enrollment) | `bash monitor/scripts/live.sh users disable-mfa alice` |
+| Administrator-assisted authenticator enrollment | `bash monitor/scripts/live.sh users mfa alice` |
 | Disable an account | `bash monitor/scripts/live.sh users disable alice` |
 | Restore a disabled account | `bash monitor/scripts/live.sh users enable alice` |
 | Inspect account roles, enabled status, and MFA status | `bash monitor/scripts/live.sh users list` |
 
-Password reset prompts for the new password twice and **does not disable MFA**.
+For a lost authenticator, the administrator must verify the person's identity
+outside the monitor before running `users disable-mfa alice`. This revokes full
+and pending sessions. The next password login **requires fresh enrollment**;
+it does not grant password-only access. Reset the password too if compromise is
+suspected. There are no recovery codes, email recovery, or security questions.
+
+The CLI password reset prompts twice and **does not reset MFA**. Profile password
+changes require both the current password and an unused authenticator code.
 Password, role, enabled-status, and MFA changes revoke existing sessions; sign
 in again afterward. Recovery requires a host administrator with access to the
-private database, not a browser user. No public registration or self-service
-password reset is exposed. If login is temporarily rate-limited, wait for the
+private database, not a browser user. No public registration or forgotten-password reset is exposed; signed-in users
+can change their own password in Profile. If login is temporarily rate-limited, wait for the
 15-minute window to expire; resetting the password does not clear that limit.
 
 Authenticated session cookies are opaque, HttpOnly, SameSite=Strict, and Secure by default.
 The local launcher allows HTTP cookies only on loopback. Logout deletes the
 server-side session, and account/password/role/MFA changes revoke all that user's
-sessions. Sessions expire after 15 minutes without page navigation/control
+sessions. Sessions expire after one hour without page navigation/control
 requests or after eight hours absolutely. Background polling and SSE do not
 extend idle lifetime. Event streams also check revocation while quiet. The server admits at most eight
 streams total and four per account (two dashboards), reserving eight of its 16
 workers for login, status, and controls. Additional streams get HTTP 429; close
 extra dashboards to reconnect. This bounds streaming load, not arbitrary HTTP floods.
 
-Login is limited to five failed attempts per username/source-IP pair and 20 total attempts per
-source IP in a rolling 15-minute window; blocked requests return HTTP 429.
+Authentication and security-setting verification share five failed attempts per
+username/source-IP pair and 20 total verification steps per source IP in a rolling 15-minute window; blocked requests return HTTP 429.
 Limits persist across restarts and cannot be bypassed by `X-Forwarded-For`.
 Failures from another source address do not lock the account globally. Clients
 sharing one address (including a reverse proxy or local users) share its limit.
@@ -322,7 +363,7 @@ python -m pytest monitor/tests -q
 ```
 
 Real Docker lifecycle tests are opt-in and must target a disposable container.
-See [TESTING.md](TESTING.md) for mock services, combined acceptance, and native
+See [TESTING.md](TESTING.md) for disposable Docker acceptance and native
 Falco capture checks; [HANDOFF.md](HANDOFF.md) records executed results and limits.
 
 ## CI and required checks
@@ -333,6 +374,20 @@ integration tests are explicitly excluded from this unprivileged unit job.
 The repository maintainer must enable branch protection/rulesets on `main` and
 require the `monitor-unit-tests` status check. A workflow file alone cannot
 prevent merges or configure that repository-level setting.
+
+## Upgrading to mandatory MFA
+
+Stop the old web monitor and back up its private auth directory before the first
+start with this version. Deploy the updated web image and CLI together. Schema
+migration preserves usernames, roles, password hashes, enabled status, and existing
+TOTP keys/counters, and revokes **all existing sessions once**, including accounts
+that already had MFA. Existing enrolled users keep their authenticator; others
+must enroll after entering their password. Later restarts preserve valid sessions.
+
+The schema migration is transactional. Do not run an older monitor image against
+the upgraded database; restore the pre-upgrade backup if rolling back. Treat that
+backup as sensitive, keep it private, and do not commit it. The standard launcher
+stops the previous monitor before starting the new web process.
 
 ## Migration from Basic Auth
 
@@ -375,3 +430,9 @@ and 3.14 must pass before the aggregate `monitor-unit-tests` check passes.
 `workflow_dispatch` also permits manual runs once the workflow is available on
 the repository's default branch. Enabling Actions, approving a fork run, and
 requiring the check are repository settings; code alone cannot perform them.
+
+
+The profile authentication design follows [OWASP MFA guidance](https://cheatsheetseries.owasp.org/cheatsheets/Multifactor_Authentication_Cheat_Sheet.html)
+and [reauthentication guidance](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html):
+password-stage sessions cannot access protected resources, factor changes require
+existing credentials, and security changes revoke or rotate sessions.

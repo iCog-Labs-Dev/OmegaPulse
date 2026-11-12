@@ -29,7 +29,7 @@ class MonitorConfig:
     browser_log_limit: int = 1000
     security_events_file: Path | None = None
     cookie_secure: bool = True
-    session_idle_seconds: int = 900
+    session_idle_seconds: int = 3600
     session_lifetime_seconds: int = 28800
 
     @classmethod
