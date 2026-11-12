@@ -2,6 +2,7 @@
 import argparse
 import getpass
 import sqlite3
+import time
 
 import pyotp
 from werkzeug.security import generate_password_hash
@@ -40,9 +41,10 @@ def main():
             print('Add this private enrollment URI to your authenticator; do not share it:')
             print(pyotp.TOTP(secret).provisioning_uri(args.username, issuer_name='Oma monitor'))
             code = getpass.getpass('Current authenticator code: ')
-            if not pyotp.TOTP(secret).verify(code):
+            counter=int(time.time()//30)
+            if not pyotp.TOTP(secret).verify(code,for_time=counter*30):
                 raise ValueError('Invalid code; MFA was not enabled')
-            store.update_user(args.username, totp_secret=secret, last_totp=-1)
+            store.update_user(args.username, totp_secret=secret, last_totp=counter)
         elif args.command == 'disable-mfa':
             store.update_user(args.username, totp_secret=None, last_totp=-1)
         else:

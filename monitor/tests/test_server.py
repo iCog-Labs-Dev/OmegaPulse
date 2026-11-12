@@ -4,6 +4,7 @@ import threading
 import time
 
 import requests
+import pyotp
 from waitress import create_server
 
 from monitor.app import create_app, SERVER_THREADS
@@ -28,6 +29,7 @@ def test_saturated_streams_do_not_block_status_login_or_stop(tmp_path):
     store = AuthStore(tmp_path/'users.db')
     for name in ('alice', 'bob', 'operator'):
         store.add_user(name, 'long-server-password', 'operator')
+        store.update_user(name,totp_secret='JBSWY3DPEHPK3PXP')
     app = create_app(MonitorConfig(auth_db=store.path, cookie_secure=False),
                      QuietBackend(), auth_store=store)
     server = create_server(app, host='127.0.0.1', port=0, threads=SERVER_THREADS)
@@ -43,6 +45,11 @@ def test_saturated_streams_do_not_block_status_login_or_stop(tmp_path):
         csrf = re.search(r'name="csrf_token" value="([^"]+)"', page).group(1)
         response = client.post(base+'/login', json={'username': name,
                                'password': 'long-server-password', 'csrf_token': csrf}, timeout=2)
+        assert response.status_code == 200
+        page = client.get(base+'/login/mfa',timeout=2).text
+        csrf = re.search(r'name="csrf_token" value="([^"]+)"',page).group(1)
+        response = client.post(base+'/login/mfa',json={'otp':pyotp.TOTP('JBSWY3DPEHPK3PXP').now(),
+                               'csrf_token':csrf},timeout=2)
         assert response.status_code == 200
         return client
 

@@ -1,0 +1,120 @@
+{
+  "date": "2026-11-12",
+  "base_commit": "3c22662",
+  "branch": "feat/profile-mandatory-mfa",
+  "scope": "Mandatory MFA, two-step login, own-account password/authenticator settings, administrator-assisted recovery",
+  "unit_tests": {
+    "python_3_12": {
+      "passed": 123,
+      "deselected_integration": 3,
+      "seconds": 21.46
+    },
+    "python_3_14": {
+      "passed": 123,
+      "deselected_integration": 3,
+      "seconds": 22.07
+    }
+  },
+  "docker_acceptance": {
+    "passed": 3,
+    "seconds": 41.56,
+    "target": "Separate non-root disposable fixture; removed after testing"
+  },
+  "http_checks": {
+    "date": "2026-11-12",
+    "base_url": "http://127.0.0.1:8767",
+    "result": "passed",
+    "checks": {
+      "first_login_enrollment_and_password_change": "passed",
+      "mfa_replacement_cookie_rotation_and_new_factor_login": "passed",
+      "real_falco_critical_event_after_mandatory_mfa": "passed"
+    }
+  },
+  "final_image_http_checks": {
+    "result": "passed",
+    "checks": [
+      "final Docker image enrollment",
+      "password-stage security API denial",
+      "viewer control denial",
+      "1024-character Unicode password change",
+      "new-password first step and mandatory MFA gate"
+    ]
+  },
+  "browser_checks": {
+    "result": "passed",
+    "browser": "154.0",
+    "checks": [
+      "password screen",
+      "QR enrollment render",
+      "MFA confirmation",
+      "dashboard Critical event",
+      "Profile navigation",
+      "password change and sign-out"
+    ],
+    "qr_dimensions": {
+      "width": 240,
+      "height": 240,
+      "paths": 1
+    },
+    "screenshots": "private Git-ignored profile-ui directory; enrollment test account disabled afterward"
+  },
+  "image_build": "passed; oma-monitor:profile-mfa",
+  "security_properties": {
+    "mandatory_for_all_roles": true,
+    "legacy_sessions_revoked_once": true,
+    "legacy_passwords_roles_totp_preserved": true,
+    "password_step_grants_api_access": false,
+    "challenge_lifetime_seconds": 300,
+    "challenge_max_incorrect_codes": 5,
+    "pending_identity_in_legacy_authenticated_username": false,
+    "csrf_and_cross_site_checks": true,
+    "factor_reauthentication_rotates_token_and_csrf": true,
+    "security_changes_revoke_all_user_sessions": true,
+    "recovery": "Host CLI reset; mandatory re-enrollment; no recovery codes or public reset",
+    "qr_rendering": "Local SVG using qrcode 8.2; no external QR service",
+    "maximum_request_bytes": 65536,
+    "session_idle_seconds": 3600,
+    "session_absolute_seconds": 28800
+  },
+  "preview": {
+    "url": "http://127.0.0.1:8767",
+    "container": "oma-monitor-profile",
+    "credentials": "Private Git-ignored profile-demo/credentials.json; not included in evidence"
+  },
+  "cleanup": "Lifecycle fixture and temporary Firefox driver removed; automated HTTP/browser accounts disabled; demo accounts preserved",
+  "checks": {
+    "compileall": "passed",
+    "shell_syntax": "passed",
+    "diff_whitespace": "passed"
+  },
+  "limitations": [
+    "Administrator must verify recovery identity outside the application",
+    "MFA secrets and backups require private storage; existing SQLite model retained",
+    "HTTPS remains required for remote deployment; demo uses loopback HTTP",
+    "Upstream CI and deployment have not been executed for this local branch"
+  ],
+  "publication": "Local working tree; no commit, push, deployment or PR",
+  "design_references": [
+    "https://cheatsheetseries.owasp.org/cheatsheets/Multifactor_Authentication_Cheat_Sheet.html",
+    "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html"
+  ],
+  "source_sha256": {
+    "monitor/auth.py": "c828abcd4165e64e24da2f66cc36c8a29737f268975f5d38e7d06120d3f254c5",
+    "monitor/account_routes.py": "e72d813dace394a49e5e56275439505fe7031a16246aa0f315166623e6b5ae84",
+    "monitor/app.py": "82179747484b7427ebc9d5d515d54d6197f1451508142c26932ee3fcdc3689e3",
+    "monitor/users.py": "151243de5b1e000e0825f70f8232ead6c63eca7f4e1ce6b53ff853a48fbc43dd",
+    "monitor/requirements.txt": "0f360d3819469ab4ea3264444cf6c0d7f3d9311e8e6ffaf1d3f0e027327215c8",
+    "monitor/config.py": "c717f2d3212f700e03d1bead2e435d7ebceb42f0b43dd62b153cc959f9f8330d"
+  },
+  "runtime_source_matches_tested_source": true,
+  "session_timeout_validation": {
+    "result": "passed",
+    "checks": [
+      "Authenticated access remains valid beyond 15 minutes and until one hour idle",
+      "Idle session expires at one hour",
+      "Page activity extends idle lifetime but not the eight-hour absolute limit",
+      "Background status polling does not extend idle lifetime",
+      "Refreshed preview reports 3600-second idle, 28800-second absolute, and 300-second MFA challenge limits"
+    ]
+  }
+}

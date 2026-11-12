@@ -33,16 +33,33 @@ def setup(tmp_path):
     store = AuthStore(tmp_path / 'auth.sqlite3', clock=lambda: now[0])
     store.add_user('alice', 'a-long-test-password', 'operator')
     store.add_user('bob', 'another-long-password', 'viewer')
+    for username in ('alice','bob'):
+        store.update_user(username,totp_secret='JBSWY3DPEHPK3PXP')
     backend = FakeBackend()
     app = create_app(MonitorConfig(auth_db=store.path, cookie_secure=False), backend, auth_store=store)
     app.testing = True
     return app, app.test_client(), backend, store, now
 
 
-def login(client, username='alice', password='a-long-test-password', otp='', headers=None):
+def password_step(client, username='alice', password='a-long-test-password', headers=None):
+    client.delete_cookie(COOKIE)
     page = client.get('/login').get_data(as_text=True)
     csrf = re.search(r'name="csrf_token" value="([^"]+)"', page).group(1)
-    return client.post('/login', json={'username': username, 'password': password, 'otp': otp, 'csrf_token': csrf}, headers=headers)
+    return client.post('/login', json={'username':username,'password':password,'csrf_token':csrf}, headers=headers)
+
+
+def login(client, username='alice', password='a-long-test-password', otp=None, headers=None):
+    response = password_step(client,username,password,headers)
+    if response.status_code != 200:
+        return response
+    page = client.get('/login/mfa').get_data(as_text=True)
+    csrf = re.search(r'name="csrf_token" value="([^"]+)"', page).group(1)
+    store = client.application.config['AUTH_STORE']
+    if otp is None:
+        enrollment = store.enrollment(client.get_cookie(COOKIE).value)
+        secret = enrollment['secret'] if enrollment else 'JBSWY3DPEHPK3PXP'
+        otp = pyotp.TOTP(secret).at(store.clock())
+    return client.post('/login/mfa',json={'otp':otp,'csrf_token':csrf},headers=headers)
 
 
 def token(client):
@@ -136,21 +153,35 @@ def test_account_changes_revoke_sessions(setup, change):
     assert client.get('/api/status').status_code == 401
 
 
-@pytest.mark.parametrize('seconds',[901,28801])
-def test_session_expiration(setup, seconds):
+def test_session_idle_expiration_after_one_hour(setup):
     _, client, _, _, now = setup
     login(client)
-    now[0] += seconds
+    now[0] += 901
+    assert client.get('/api/status').status_code == 200
+    now[0] += 2698
+    assert client.get('/api/status').status_code == 200
+    now[0] += 1
+    assert client.get('/api/status').status_code == 401
+
+
+def test_activity_extends_idle_but_not_eight_hour_absolute_lifetime(setup):
+    _, client, _, _, now = setup
+    login(client)
+    for _ in range(8):
+        now[0] += 3500
+        assert client.get('/').status_code == 200
+    now[0] += 800
     assert client.get('/api/status').status_code == 401
 
 
 def test_background_status_poll_does_not_extend_idle_session(setup):
     _, client, _, _, now = setup
     login(client)
-    now[0] += 800
+    now[0] += 3500
     assert client.get('/api/status').status_code == 200
     now[0] += 101
     assert client.get('/api/status').status_code == 401
+
 
 
 def test_source_account_lockout_persists_and_does_not_lock_other_addresses(setup):
@@ -176,11 +207,11 @@ def test_ip_limit_applies_across_usernames_and_ignores_forwarded_header(setup):
     assert login(client).status_code == 429
 
 
-def test_optional_mfa_requires_code_and_rejects_replay(setup):
+def test_mfa_requires_code_and_rejects_replay(setup):
     app, client, _, store, now = setup
     secret = pyotp.random_base32()
     store.update_user('alice', totp_secret=secret)
-    assert login(client).status_code == 401
+    assert login(client, otp='').status_code == 401
     assert login(client, otp='🔑').status_code == 401
     code = pyotp.TOTP(secret).at(now[0])
     assert login(client, otp=code).status_code == 200
@@ -310,7 +341,7 @@ def test_upgrade_retires_legacy_anonymous_rows_and_preserves_signed_cookies(setu
     assert login(client).status_code == 200
     authenticated = client.get_cookie(COOKIE).value
     with store.connection() as db:
-        db.execute('INSERT INTO sessions VALUES(?,NULL,?,?,?)',
+        db.execute("INSERT INTO sessions(token_hash,username,csrf,created,touched,phase) VALUES(?,NULL,?,?,?,'legacy')",
                    ('legacy-anonymous', 'old-csrf', now[0], now[0]))
     upgraded = AuthStore(store.path, clock=lambda: now[0])
     assert upgraded.session(prelogin)['username'] is None
