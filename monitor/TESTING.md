@@ -18,65 +18,43 @@ The real Docker and combined acceptance tests are skipped unless explicitly
 configured. They stop/start/restart their target, so use a disposable container.
 Do not point them at a live Telegram/provider bot.
 
-## Current-source Oma with mock services
+## Disposable Docker acceptance
 
-Build the current checkout. Check that the following dedicated test names are
-unused before creating them; do not remove an existing container to make room.
-No Telegram or model-provider credentials are supplied.
-
-```bash
-docker build -t omega:monitor-test .
-docker network create oma-monitor-acceptance-net
-docker run -d --name oma-monitor-mocks \
-  --network oma-monitor-acceptance-net --user 65534:65534 \
-  --entrypoint python3 \
-  --mount "type=bind,src=$PWD,dst=/workspace,readonly" \
-  -w /workspace omega:monitor-test monitor/tests/omega_mock_services.py
-```
-
-Wait for `Omega mock services ready: LLM=9765 channel=9766` in its logs. Then:
+These tests exercise real Docker status/logs/controls and authenticated HTTP with
+mandatory MFA. They need no Oma source checkout, provider key, or Telegram token.
+Check that `oma-monitor-acceptance` is unused; never point lifecycle tests at the
+live bot. Build the standalone image and create a small non-root fixture:
 
 ```bash
-docker run -dit --name oma-monitor-acceptance \
-  --network oma-monitor-acceptance-net \
-  --security-opt no-new-privileges:true --init \
-  --tmpfs /tmp:size=64m,mode=1777 --tmpfs /var/tmp:size=64m,mode=1777 \
-  --tmpfs /run:size=16m,mode=755 \
-  --volume oma-monitor-acceptance-memory:/PeTTa/repos/Omega/memory \
-  -e TEST_SERVER_IP=oma-monitor-mocks -e IMPORT_KB_ON_START=0 \
-  -e HF_HUB_OFFLINE=1 -e TRANSFORMERS_OFFLINE=1 \
-  omega:monitor-test commchannel=test provider=Test embeddingprovider=Local \
-  securityPolicyPath=/PeTTa/repos/Omega/profile/policy.yaml \
-  memoryDirectory=/PeTTa/repos/Omega/memory TEST_SERVER_IP=oma-monitor-mocks
-```
+docker build -t oma-monitor:acceptance monitor
+docker run -d --name oma-monitor-acceptance --network none \
+  --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges:true \
+  --entrypoint python oma-monitor:acceptance -u -c \
+  'import time; print("Disposable acceptance target", flush=True); time.sleep(3600)'
 
-Wait for connections to both mock ports and a `CHARS_SENT` record. In the Python
-test environment, run:
-
-```bash
 OMA_MONITOR_INTEGRATION_CONTAINER=oma-monitor-acceptance \
 OMA_MONITOR_ACCEPTANCE_CONTAINER=oma-monitor-acceptance \
-  python -m pytest monitor/tests/test_docker_integration.py \
-    monitor/tests/test_acceptance_integration.py -q
+  python -m pytest monitor/tests -q -m integration
 ```
 
-Expected: three tests pass. The lifecycle test restores the initial state; the
-combined test checks authentication, real status/logs, fixed-target rejection,
-controls, and controlled Falco JSON filtering/redaction. This is not kernel capture.
+Expected: three tests pass. Do not add `--rm` to this particular fixture: a Stop
+would remove it before the tests could Start/Restart it. It has no host mounts or
+socket and is removed explicitly afterward. The combined test uses a private
+throwaway account database, verifies password-stage API denial, completes MFA,
+then checks status/logs, controlled Falco JSON filtering/redaction, and controls.
+This is separate from native kernel capture.
 
-For a browser check, point the independent monitor at this disposable target:
+For browser acceptance, configure the monitor to select the disposable target:
 
 ```bash
 OMA_MONITOR_CONTAINER=oma-monitor-acceptance bash monitor/scripts/live.sh start
 ```
 
-After stopping the monitor, remove only the resources you created for this test:
+Complete first-login MFA setup in the browser. After stopping that monitor,
+remove only the fixture created for this check:
 
 ```bash
-docker stop oma-monitor-acceptance oma-monitor-mocks
-docker rm oma-monitor-acceptance oma-monitor-mocks
-docker volume rm oma-monitor-acceptance-memory
-docker network rm oma-monitor-acceptance-net
+docker rm -f oma-monitor-acceptance
 ```
 
 ## Real native-Linux Falco test
@@ -143,7 +121,7 @@ dropped-event metrics, and log retention separate from this short integration te
 Unit tests cover individual login, password hashing, viewer/operator permissions,
 login/action/logout CSRF, cookie flags, session fixation prevention, server-side
 revocation, idle/absolute expiration, quiet-stream shutdown, persistent username
-lockout and IP limits, optional TOTP/replay rejection, size/time rotation,
+lockout and IP limits, mandatory two-step TOTP/replay rejection, size/time rotation,
 timestamped archive retention, reader follow after rotation, and target injection
 rejection. CI runs `python -m pytest monitor/tests -q -m 'not integration'` on every
 PR. Require its `monitor-unit-tests` status in repository branch protection.
@@ -186,3 +164,37 @@ harness exercises sendto/sendmsg rather than sendmmsg.
 Recorded evidence is in `validation/review-hardening-2026-10-09.json`. GitHub
 Actions runs need independent verification in the upstream PR; local passing
 checks do not prove that upstream Actions settings or protection are enabled.
+
+
+## Mandatory MFA and Profile acceptance
+
+Run the full unprivileged suite on Python 3.12 and 3.14. New coverage in
+`test_profile_mfa.py` exercises first-login enrollment, existing-account MFA,
+password-stage access denial, five-minute expiry, cross-stage throttling, atomic
+challenge consumption, token replay, migration, and authenticated password/MFA
+changes. The HTTP-server test performs both login steps while streams are loaded.
+
+For manual browser acceptance, use a test identity directory and localhost port:
+
+1. Create one operator and one viewer with the host CLI. Neither needs CLI MFA
+   enrollment. Start the updated monitor against a disposable target.
+2. Sign in with a password. Confirm that a second screen requires QR/manual-key
+   setup, and that dashboard/API access is denied until a valid code is confirmed.
+3. Sign out. Sign in again: password is followed by a code-only second screen.
+   Reused codes must fail; wait for a fresh code. Both roles must complete MFA.
+4. Open Profile. A wrong current password/code or missing CSRF must reject changes.
+   A successful password change signs out every session; only the new password
+   works. Username and role cannot be changed through the profile form.
+5. Start authenticator replacement using the old password/code. The session token
+   changes before the replacement key is shown. Cancel or let five minutes expire:
+   the original factor still works. Confirm the new factor: all sessions close,
+   and subsequent sign-in requires the new authenticator.
+6. As host administrator run `users disable-mfa USER`. Existing full/pending
+   sessions must fail and the next password sign-in must require enrollment again.
+7. Verify viewer controls still return 403 and security signals/logs require a
+   completed MFA session. Inspect audit output without publishing setup keys/codes.
+
+For migration, back up and stop the old monitor first. Test both an enrolled and
+an unenrolled legacy account. Both old cookies must fail after the upgrade; stored
+passwords/roles/TOTP keys must remain valid. Restart the new monitor again and
+verify its completed MFA sessions are preserved (the migration runs only once).

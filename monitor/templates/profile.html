@@ -1,0 +1,45 @@
+{% extends 'account_base.html' %}
+{% block title %}Profile{% endblock %}
+{% block content %}
+<header><h1>Profile</h1><a href="/">Back to dashboard</a></header>
+<p>{{ username }} · {{ role }}</p>
+<p>MFA is required and enabled for your account.</p>
+{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+<p>Use an unused authenticator code for each change. Successful password or authenticator changes sign you out on all devices.</p>
+<section class="account-section" aria-labelledby="password-heading">
+  <h2 id="password-heading">Change password</h2>
+  <form method="post" action="/profile/password" class="account-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Current password <input name="current_password" type="password" autocomplete="current-password" maxlength="1024" required></label>
+    <label>Authenticator code <input name="otp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label>
+    <label>New password <input name="new_password" type="password" autocomplete="new-password" minlength="12" maxlength="1024" required></label>
+    <label>Confirm new password <input name="confirm_password" type="password" autocomplete="new-password" minlength="12" maxlength="1024" required></label>
+    <button type="submit">Update password</button>
+  </form>
+</section>
+<section class="account-section" aria-labelledby="mfa-heading">
+  <h2 id="mfa-heading">Replace authenticator</h2>
+  {% if enrollment %}
+    <p>Your current authenticator stays active until you confirm the replacement.</p>
+    {% include 'enrollment.html' %}
+    <form method="post" action="/profile/mfa-confirm" class="account-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>New authenticator code <input name="otp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label>
+      <button type="submit">Confirm replacement</button>
+    </form>
+    <form method="post" action="/profile/mfa-cancel">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit">Cancel replacement</button>
+    </form>
+  {% else %}
+    <p>Verify your current password and authenticator before setting up a replacement.</p>
+    <form method="post" action="/profile/mfa-start" class="account-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Current password <input name="current_password" type="password" autocomplete="current-password" maxlength="1024" required></label>
+      <label>Current authenticator code <input name="otp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label>
+      <button type="submit">Set up replacement</button>
+    </form>
+  {% endif %}
+  <p>Lost your authenticator? Contact your host administrator for an MFA reset. You must enroll again before dashboard access is restored.</p>
+</section>
+{% endblock %}

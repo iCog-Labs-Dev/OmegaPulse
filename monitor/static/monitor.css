@@ -54,3 +54,15 @@ button:hover { border-color: #7597d0; }
   .security-event { grid-template-columns: 1fr; }
   .security-event pre { grid-column: 1; }
 }
+
+a { color: #a6c5ff; }
+.account-page { max-width: 640px; }
+.account-form { display: grid; gap: 16px; margin: 24px 0; }
+.account-form label { display: grid; gap: 8px; }
+.account-form input { width: 100%; }
+.account-form button { justify-self: start; }
+.account-section { margin-top: 28px; padding: 20px; border: 1px solid #39475d; border-radius: 10px; }
+.form-error { padding: 12px; border-left: 3px solid #f15364; background: #29161f; }
+.mfa-qr { width: fit-content; max-width: 100%; margin: 20px 0; padding: 12px; background: white; }
+.mfa-qr svg { display: block; max-width: 100%; height: auto; width: 240px; }
+.setup-key { display: block; margin: 12px 0; overflow-wrap: anywhere; }

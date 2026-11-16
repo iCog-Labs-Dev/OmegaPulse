@@ -1,0 +1,18 @@
+{% extends 'account_base.html' %}
+{% block title %}Verify authenticator{% endblock %}
+{% block content %}
+<h1>{{ 'Set up your authenticator' if enrollment else 'Verify your authenticator' }}</h1>
+<p>Step 2 of 2 · MFA is required before you can access the monitor.</p>
+{% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+{% if enrollment %}{% include 'enrollment.html' %}{% endif %}
+<form method="post" action="/login/mfa" class="account-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label>Authenticator code <input name="otp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required autofocus></label>
+  <button type="submit">{{ 'Confirm setup and sign in' if enrollment else 'Sign in' }}</button>
+</form>
+<p>Codes are single use. If a code was just used, wait for the next one. If you lost your authenticator, contact your host administrator.</p>
+<form method="post" action="/logout">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <button type="submit">Start over</button>
+</form>
+{% endblock %}

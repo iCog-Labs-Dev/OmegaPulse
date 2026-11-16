@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 
 import pytest
+import pyotp
 
 from monitor.app import create_app
 from monitor.auth import AuthStore
@@ -84,6 +85,8 @@ def test_combined_monitor_acceptance(tmp_path: Path) -> None:
     )
     store = AuthStore(config.auth_db)
     store.add_user(username, password, "operator")
+    secret=pyotp.random_base32()
+    store.update_user(username,totp_secret=secret)
     app = create_app(config, backend, SecurityEventReader(events_file, TARGET), store)
     app.testing = True
     client = app.test_client()
@@ -95,6 +98,11 @@ def test_combined_monitor_acceptance(tmp_path: Path) -> None:
         login_csrf = re.search(r'name="csrf_token" value="([^\"]+)"', login_page).group(1)
         assert client.post("/login", json={"username":username, "password":"wrong-password", "csrf_token":login_csrf}).status_code == 401
         assert client.post("/login", json={"username":username, "password":password, "csrf_token":login_csrf}).status_code == 200
+
+        assert client.get('/api/status').status_code == 401
+        page=client.get('/login/mfa').get_data(as_text=True)
+        csrf_mfa=re.search(r'name="csrf_token" value="([^"]+)"',page).group(1)
+        assert client.post('/login/mfa',json={'otp':pyotp.TOTP(secret).now(),'csrf_token':csrf_mfa}).status_code == 200
 
         page_response = client.get("/", headers=auth)
         assert page_response.status_code == 200

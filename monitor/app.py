@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hmac
 import json
 import logging
 import queue
@@ -10,7 +9,8 @@ from typing import Any, Callable
 
 from flask import Flask, Response, g, jsonify, redirect, render_template, request
 
-from .auth import AuthStore, COOKIE, LoginLimited
+from .auth import AuthStore, COOKIE
+from .account_routes import register_account_routes, valid_csrf
 from .config import MonitorConfig
 from .docker_backend import DockerActionError, DockerBackend
 from .security_backend import SecurityEventReader
@@ -53,7 +53,7 @@ def create_app(
     app = Flask(__name__)
     app.config.update(
         AUTH_STORE=accounts,
-        MAX_CONTENT_LENGTH=16_384,
+        MAX_CONTENT_LENGTH=65_536,  # Three Unicode password fields plus form/JSON encoding.
         MONITOR_CONFIG=settings,
         DOCKER_BACKEND=docker_backend,
         SECURITY_BACKEND=event_reader,
@@ -65,7 +65,7 @@ def create_app(
         def wrapped(*args: Any, **kwargs: Any) -> Any:
             current = accounts.session(request.cookies.get(COOKIE, ""))
             if not current or not current["username"]:
-                if request.path == "/":
+                if request.path in {"/", "/profile"} and not request.is_json:
                     return redirect("/login", 303)
                 return jsonify({"error": "authentication-required"}), 401
             g.identity = current
@@ -121,63 +121,7 @@ def create_app(
         )
         return response
 
-    def set_cookie(response, token):
-        response.set_cookie(COOKIE, token, secure=settings.cookie_secure,
-                            httponly=True, samesite="Strict", path="/")
-        return response
-
-    def valid_csrf(current, candidate):
-        return bool(current and candidate and hmac.compare_digest(
-            candidate.encode(), current["csrf"].encode()))
-
-    @app.route("/login", methods=["GET", "POST"])
-    def login():
-        token = request.cookies.get(COOKIE, "")
-        current = accounts.session(token)
-        if request.method == "GET":
-            if current and current["username"]:
-                return redirect("/", 303)
-            if current is None:
-                try:
-                    token, _ = accounts.anonymous_session()
-                except LoginLimited:
-                    return jsonify({"error": "login-limited"}), 429
-                current = accounts.session(token)
-            return set_cookie(app.make_response(render_template("login.html", csrf_token=current["csrf"])), token)
-        fields = request.get_json(silent=True) if request.is_json else request.form
-        fields = fields if isinstance(fields, dict) or hasattr(fields, "get") else {}
-        if request.headers.get("Sec-Fetch-Site") == "cross-site" or not valid_csrf(
-            current, str(fields.get("csrf_token", ""))):
-            return jsonify({"error": "invalid-csrf-token"}), 403
-        username, password, otp = (str(fields.get(key, "")) for key in ("username", "password", "otp"))
-        if len(username) > 64 or len(password) > 1024 or len(otp) > 6:
-            return jsonify({"error": "invalid-credentials"}), 401
-        try:
-            result = accounts.login(username, password, otp, request.remote_addr or "unknown", token)
-        except LoginLimited:
-            response = jsonify({"error": "login-limited", "message": "Try again in 15 minutes."})
-            response.status_code = 429
-            response.headers["Retry-After"] = "900"
-            return response
-        if result is None:
-            logger.warning("login result=denied")
-            if request.is_json:
-                return jsonify({"error": "invalid-credentials"}), 401
-            return render_template("login.html", csrf_token=current["csrf"],
-                                   error="Invalid credentials or authenticator code."), 401
-        logger.info("login user=%s result=accepted", username)
-        response = jsonify({"ok": True}) if request.is_json else redirect("/", 303)
-        return set_cookie(response, result[0])
-
-    @app.post("/logout")
-    @authenticated
-    def logout():
-        if not valid_csrf(g.identity, request.headers.get("X-CSRF-Token", "")):
-            return jsonify({"error": "invalid-csrf-token"}), 403
-        accounts.revoke(request.cookies.get(COOKIE, ""))
-        response = jsonify({"ok": True})
-        response.delete_cookie(COOKIE, secure=settings.cookie_secure, httponly=True, samesite="Strict")
-        return response
+    register_account_routes(app, accounts, settings, authenticated)
 
     def authorized_events(factory, token):
         # Poll revocation even while Docker or the security file is quiet.

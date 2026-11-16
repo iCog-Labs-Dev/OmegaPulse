@@ -1,0 +1,7 @@
+<p>Scan this QR code with your authenticator app. Keep the setup key private.</p>
+<div class="mfa-qr" aria-label="Authenticator enrollment QR code">{{ enrollment.qr }}</div>
+<details><summary>Enter the setup key manually</summary>
+  <p>Account: {{ username|default('Omega-Pulse', true) }} · Time-based (TOTP), 6 digits, 30 seconds</p>
+  <code class="setup-key">{{ enrollment.secret }}</code>
+</details>
+<p>Enter a code from the new authenticator to confirm. Setup expires after five minutes.</p>

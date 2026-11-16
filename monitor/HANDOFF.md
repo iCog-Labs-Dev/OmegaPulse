@@ -1,6 +1,6 @@
 # Oma monitoring handoff
 
-Last updated: 2026-10-08
+Last updated: 2026-11-12
 
 ## Purpose and scope
 
@@ -12,10 +12,10 @@ Telegram behavior, or deployment workflows. No AI/ML is used.
 
 Still deferred: automatic containment, Docker Pause, host/network isolation,
 production Falco deployment/tuning, centralized retention/dashboards, and
-production deployment. Individual accounts, roles, sessions, optional MFA, and
-bounded local event rotation were added in the PR review follow-up below.
+production deployment. Individual accounts, roles, sessions, mandatory MFA, and bounded local event
+rotation are implemented; the review and profile follow-ups are recorded below.
 
-## Repository and base
+## Repository and base (historical context)
 
 - Original source upstream: `https://github.com/iCog-Labs-Dev/Omega.git`
 - Intended monitor PR destination (operator confirmed):
@@ -32,8 +32,9 @@ bounded local event rotation were added in the PR review follow-up below.
   commits behind at the time of review. The feature must not be rebased onto
   that stale ref.
 
-The historical sections below record pre-publication work. OmegaPulse PR #1 now
-exists; these review fixes are prepared locally and have not been pushed.
+The historical sections below record earlier work. OmegaPulse PR #1 was merged
+as organization main commit `3c22662`. The current Profile/MFA follow-up is local
+on `feat/profile-mandatory-mfa` in the `OmegaPulse-main-validation` worktree.
 No production deployment or release was performed.
 
 ## Review findings verified
@@ -485,3 +486,120 @@ received the first marker from the new run, compared against Docker's actual
 `State.StartedAt` so older retained startup lines could not satisfy the check.
 All temporary lifecycle and native containers were removed. Native rotated
 files were private and within the configured 20 KiB limit.
+
+
+### Merged-main alert visibility verification — 2026-11-12
+
+Fetched organization `main` and verified merge commit `3c22662`; its monitor tree
+matches `e50bed9`. Created the isolated `OmegaPulse-main-validation` worktree on
+`verify/falco-dashboard`, preserving the original review checkout. No running
+containers existed at initial inspection. Built `oma-monitor:main-verification`
+and `oma-falco:main-verification` from that merged tree.
+
+A temporary native modern-eBPF sensor and non-root disposable target generated
+**3 Notice, 4 Warning, and 2 Critical** marked alerts across all six rule families.
+The Critical events were `connect` and `openat` against a fake `/run/docker.sock`
+inside the target's tmpfs. The target was `--rm`, read-only, network-isolated,
+capabilities dropped, and had no host mounts or real Docker socket. Only the
+previously approved sensor had privileged host observation access.
+
+The actual monitor on localhost:8766 delivered all three priorities through
+HTTP/SSE to separate operator and viewer sessions. Guest security status/events
+requests returned 401. Operator control buttons were present; viewer buttons
+were absent and its Stop request returned 403. Controlled demonstration tokens
+were redacted. Native source and target container identity matched the raw alerts.
+The current application has no separate admin role and does not restrict high
+priorities to operators. Existing CSS marks Warning/Error orange and
+Critical/Alert/Emergency red. No browser automation or successful breach is claimed.
+
+The user requested a visible demonstration, so these temporary containers remain
+running for browser inspection: `oma-demo-target-20261112`,
+`oma-demo-falco-20261112`, and `oma-demo-monitor-20261112`. The latter listens on
+http://127.0.0.1:8766. Temporary operator/viewer credentials are private in
+`monitor/.local/falco-dashboard-demo/credentials.json` (0600), not published.
+The target exits after 24 hours; stop the sensor/monitor when the demo is finished.
+
+From this worktree, the Git-ignored local helper supports:
+`python3 monitor/.local/falco_dashboard_demo.py signals` to trigger another marked
+batch, `check` for HTTP/native verification, and `down` to stop/remove only the
+label-checked demo containers. This helper is session-local rather than a shipped
+product feature. Reproduction of the shipped native test remains in TESTING.md.
+Evidence: `monitor/validation/dashboard-visibility-2026-11-12.json`.
+Only access documentation/evidence changed; no product access policy was changed,
+and no commit, push, deployment, or PR was performed in this verification.
+
+
+### Mandatory MFA and Profile — 2026-11-12
+
+Implemented the agreed scope on `feat/profile-mandatory-mfa`, based on merged
+organization main `3c22662`. Preserved the prior dashboard verification evidence
+and the original review checkout. No repository publication was performed.
+
+- Login is now password first, followed by mandatory TOTP verification or initial
+  QR/manual-key enrollment. Every existing/new viewer/operator must complete MFA.
+  Password-stage sessions expire after five minutes and cannot access dashboard,
+  APIs, streams, or Profile. Five incorrect codes discard the challenge even if
+  source IP changes; persistent source-IP/account limits remain shared across steps.
+- Profile shows immutable username/role, password change, and authenticator
+  replacement. Sensitive changes require the current password and an unused code.
+  Replacement reauthentication rotates cookie/CSRF before displaying the new key;
+  the previous factor stays active until confirmation. Cancel/expiration leaves
+  it intact. Successful password/factor changes revoke all sessions for that user.
+- Host CLI recovery remains `users disable-mfa USER`: verify identity outside the
+  app, reset the factor, then require enrollment on the next password login.
+  There are no recovery codes, email resets, registration, or web MFA-disable switch.
+- SQLite migration is transactional and revokes legacy sessions once while
+  preserving passwords, roles, enabled flags, and enrolled TOTP keys/counters.
+  Pending identities are separate from the old authenticated username column so
+  older session readers also fail closed. Stop/back up the old monitor before
+  upgrade; run compatible web/CLI versions together. Later restarts preserve valid
+  completed MFA sessions. Database/backups remain private (0600).
+- Removed the previous combined optional-MFA login implementation. Account routes
+  live separately from Docker/streaming handlers; common account templates share
+  layout/enrollment markup. Added one runtime dependency, `qrcode==8.2`, for local
+  SVG generation. No external QR service or frontend framework is used.
+- Tightened scalar/UTF-8 and CSRF input validation. Raised the bounded request
+  limit to 64 KiB to support the documented three Unicode password fields; bodies
+  exceeding it return 413. No credentials/setup keys/codes are audit logged.
+
+Final verification: **123 unit tests passed on each Python version** (3.12:
+21.23 s; 3.14: 21.42 s; three integration tests deselected). The three real Docker
+acceptance tests passed in 41.56 s with the updated two-step login. The actual
+Docker image passed HTTP enrollment, password-change, factor-replacement, and
+post-MFA native Critical-event delivery checks. A final image smoke test also
+verified maximum-length Unicode passwords and viewer control denial.
+
+Headless Firefox **154.0** exercised the password screen, QR rendering (240×240),
+MFA confirmation, dashboard Critical alert display, Profile navigation, and the
+password form's successful sign-out. Screenshots remain private/Git-ignored;
+the browser test account was disabled. The driver and lifecycle fixture were
+removed. No production Oma container or provider credentials were used.
+
+A separate preview remains on http://127.0.0.1:8767 as `oma-monitor-profile`, using
+`monitor/.local/profile-demo/auth/` and the existing disposable Falco target/events.
+The test credentials file `monitor/.local/profile-demo/credentials.json` contains
+only `demo-operator` and `demo-viewer`; both can perform their own first-login
+setup. Use a private browser window when comparing with the older port-8766 demo
+because browser cookies are shared across ports. Stop the preview with
+`docker stop oma-monitor-profile` when finished. Other demo containers remain
+controlled by the earlier local helper's `down` command.
+
+Evidence: `monitor/validation/profile-mfa-2026-11-12.json`. README explains sign-in,
+Profile, recovery and migration; TESTING includes the acceptance checklist and a
+lightweight Docker fixture that works in the standalone OmegaPulse repository.
+GitHub CI/protection and any production rollout remain separate actions.
+
+### 2026-11-12 — One-hour authenticated idle timeout
+
+Changed the default authenticated idle timeout from 15 minutes to one hour in
+both configuration and the authentication store. Page navigation/control requests
+extend idle time; background polling/SSE do not. The eight-hour absolute lifetime,
+five-minute MFA challenge, and 15-minute login throttling window remain unchanged.
+
+Verification: 123 unit tests passed on Python 3.12 (21.46 s) and 3.14 (22.07 s),
+with three integration tests deselected. Fake-clock tests cover validity beyond
+15 minutes, expiry at one hour, activity renewal, and the absolute eight-hour cap.
+Rebuilt the Docker image and refreshed only the profile preview on port 8767,
+preserving its account database. Runtime defaults and auth/config source hashes
+match the tested files. README and validation evidence reflect the new timeout.
+Changes remain local and uncommitted.
