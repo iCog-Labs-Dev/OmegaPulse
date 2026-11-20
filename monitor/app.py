@@ -228,6 +228,13 @@ def create_app(
             stopped.set()
             worker.join(timeout=1)
 
+    @app.get("/healthz")
+    def healthz() -> Response:
+        return jsonify({
+            "status": "ok",
+            "version": settings.pulse_version,
+        })
+
     @app.get("/")
     @authenticated
     def index() -> str:
@@ -239,6 +246,7 @@ def create_app(
             csrf_token=g.identity["csrf"],
             username=g.identity["username"],
             can_control=g.identity["role"] == "operator",
+            pulse_version=settings.pulse_version,
         )
 
     @app.get("/api/status")

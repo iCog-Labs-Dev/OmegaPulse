@@ -44,6 +44,8 @@ input, button { border: 1px solid #3b4a61; border-radius: 6px; background: #0c12
 input { width: min(300px, 35vw); }
 button { cursor: pointer; min-width: 76px; }
 button:hover { border-color: #7597d0; }
+footer { margin-top: 32px; text-align: center; }
+footer .version { color: #8ea0bd; font-size: .75rem; }
 #logs { height: min(68vh, 720px); margin: 0; overflow: auto; padding: 16px; color: #c9d5e8; font: 13px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 680px) {
   main { width: min(100% - 20px, 1120px); padding-top: 24px; }

@@ -31,6 +31,7 @@ class MonitorConfig:
     cookie_secure: bool = True
     session_idle_seconds: int = 900
     session_lifetime_seconds: int = 28800
+    pulse_version: str = '0.1.0-dev'
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None):
@@ -52,8 +53,10 @@ class MonitorConfig:
         db = values.get('OMA_MONITOR_AUTH_DB', 'monitor/.local/auth/users.sqlite3').strip()
         if not db:
             raise ConfigurationError('OMA_MONITOR_AUTH_DB cannot be empty')
+        pulse_version = values.get('PULSE_VERSION', '0.1.0-dev').strip() or '0.1.0-dev'
         return cls(auth_db=Path(db).expanduser(),
                    container_name=container_name(values.get('OMA_MONITOR_CONTAINER', 'omega').strip()),
                    host=host, port=port, cookie_secure=secure == 'true',
                    security_events_file=Path(values['OMA_MONITOR_SECURITY_EVENTS_FILE']).expanduser()
-                   if values.get('OMA_MONITOR_SECURITY_EVENTS_FILE', '').strip() else None)
+                   if values.get('OMA_MONITOR_SECURITY_EVENTS_FILE', '').strip() else None,
+                   pulse_version=pulse_version)
