@@ -26,3 +26,9 @@ def test_insecure_cookie_allowed_only_on_loopback():
 def test_bad_configuration(values):
     with pytest.raises(ConfigurationError):
         MonitorConfig.from_env(values)
+
+
+def test_pulse_version_default_and_env():
+    assert MonitorConfig.from_env({}).pulse_version == '0.1.0-dev'
+    assert MonitorConfig.from_env({'PULSE_VERSION': '1.2.3'}).pulse_version == '1.2.3'
+
