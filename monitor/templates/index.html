@@ -65,6 +65,9 @@
         <p class="notice">Signals describe attempts, not confirmed breaches. Outbound Notices include normal provider and Telegram connections.</p>
         <div id="security-events" aria-live="polite"></div>
       </section>
+      <footer>
+        <small class="version">Pulse v{{ pulse_version }}</small>
+      </footer>
     </main>
     <script src="{{ url_for('static', filename='monitor.js') }}" defer></script>
   </body>

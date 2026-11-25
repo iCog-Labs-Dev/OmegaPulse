@@ -1,5 +1,6 @@
 name: Monitor tests
 on:
+  workflow_call:
   pull_request:
   workflow_dispatch:
   push:
@@ -24,7 +25,7 @@ jobs:
           cache-dependency-path: monitor/requirements*.txt
       - run: python -m pip install -r monitor/requirements-dev.txt
       - run: python -m pytest monitor/tests -q -m 'not integration'
-      - run: bash -n monitor/scripts/live.sh monitor/scripts/falco.sh
+      - run: bash -n monitor/scripts/*.sh deploy/*.sh
   unit-tests:
     name: monitor-unit-tests
     needs: tests
