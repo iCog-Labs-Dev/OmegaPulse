@@ -20,6 +20,8 @@ jobs:
     name: Build container image
     needs: test
     runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.image }}:sha-${{ steps.meta.outputs.short_sha }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -68,4 +70,45 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy-staging:
+    name: Deploy to staging
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    steps:
+      - name: Deploy to staging over SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+          IMAGE: ${{ needs.build.outputs.image }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          for var in DEPLOY_SSH_KEY DEPLOY_HOST DEPLOY_USER DEPLOY_KNOWN_HOSTS IMAGE; do
+            if [[ -z "${!var:-}" ]]; then
+              printf 'Missing required configuration: %s\n' "$var" >&2
+              exit 1
+            fi
+          done
+
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 644 "$HOME/.ssh/known_hosts"
+
+          eval "$(ssh-agent -s)" >/dev/null
+          trap 'ssh-agent -k >/dev/null 2>&1 || true' EXIT
+          ssh-add - <<< "$DEPLOY_SSH_KEY" >/dev/null 2>&1
+
+          ssh -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+              "${DEPLOY_USER}@${DEPLOY_HOST}" \
+              "cd ~/omega-pulse && git fetch origin main && git checkout main && git pull --ff-only origin main && DEPLOY_TRIGGERED_BY='${ACTOR}' bash deploy/deploy.sh deploy/staging.env '${IMAGE}'"
 

@@ -1,0 +1,160 @@
+name: Pulse release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    name: Validate, promote image, and create GitHub Release
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate SemVer tag, main branch, and CHANGELOG
+        id: meta
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            printf '::error::Tag "%s" is not valid SemVer (expected vMAJOR.MINOR.PATCH).\n' "$TAG"
+            exit 1
+          fi
+
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+          PATCH="${BASH_REMATCH[3]}"
+          VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          MINOR_TAG="${MAJOR}.${MINOR}"
+          MAJOR_TAG="${MAJOR}"
+
+          git fetch origin main --depth=0 || git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            printf '::error::Commit %s is not on main. Releases must be tagged on main.\n' "$GITHUB_SHA"
+            exit 1
+          fi
+
+          python3 - "$VERSION" "$RUNNER_TEMP/release-notes.md" <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          version, out_path = sys.argv[1], sys.argv[2]
+          text = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+          pattern = re.compile(
+              rf"^## \[{re.escape(version)}\](?: - .*)?$\n(.*?)(?=^## \[|\Z)",
+              re.MULTILINE | re.DOTALL,
+          )
+          match = pattern.search(text)
+          if not match or not match.group(1).strip():
+              print(f"::error::CHANGELOG.md must contain a non-empty section for [{version}].")
+              sys.exit(1)
+          pathlib.Path(out_path).write_text(match.group(1).strip() + "\n", encoding="utf-8")
+          PY
+
+          SHORT_SHA="$(git rev-parse --short HEAD)"
+          REPO_LOWER="$(echo "${{ github.repository_owner }}/omega-pulse" | tr '[:upper:]' '[:lower:]')"
+          REPO_IMAGE="ghcr.io/${REPO_LOWER}"
+
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "minor_tag=${MINOR_TAG}" >> "$GITHUB_OUTPUT"
+          echo "major_tag=${MAJOR_TAG}" >> "$GITHUB_OUTPUT"
+          echo "source_image=${REPO_IMAGE}:sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "repo_image=${REPO_IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "image=${REPO_IMAGE}:${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify GHCR state and promote image without rebuilding
+        run: |
+          set -euo pipefail
+          SOURCE_IMAGE="${{ steps.meta.outputs.source_image }}"
+          TARGET_IMAGE="${{ steps.meta.outputs.image }}"
+          REPO_IMAGE="${{ steps.meta.outputs.repo_image }}"
+          MINOR_TAG="${{ steps.meta.outputs.minor_tag }}"
+          MAJOR_TAG="${{ steps.meta.outputs.major_tag }}"
+
+          if ! docker buildx imagetools inspect "$SOURCE_IMAGE" >/dev/null 2>&1; then
+            printf '::error::Source image %s not found in GHCR. Ensure main build succeeded first.\n' "$SOURCE_IMAGE"
+            exit 1
+          fi
+
+          if docker buildx imagetools inspect "$TARGET_IMAGE" >/dev/null 2>&1; then
+            printf '::error::Image tag %s already exists in GHCR; refusing to overwrite.\n' "$TARGET_IMAGE"
+            exit 1
+          fi
+
+          docker buildx imagetools create \
+            --tag "$TARGET_IMAGE" \
+            --tag "${REPO_IMAGE}:${MINOR_TAG}" \
+            --tag "${REPO_IMAGE}:${MAJOR_TAG}" \
+            "$SOURCE_IMAGE"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.meta.outputs.tag }}" \
+            --title "Omega Pulse ${{ steps.meta.outputs.tag }}" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
+
+  deploy-production:
+    name: Deploy to production
+    needs: release
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - name: Deploy to production over SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+          IMAGE: ${{ needs.release.outputs.image }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          for var in DEPLOY_SSH_KEY DEPLOY_HOST DEPLOY_USER DEPLOY_KNOWN_HOSTS IMAGE; do
+            if [[ -z "${!var:-}" ]]; then
+              printf 'Missing required configuration: %s\n' "$var" >&2
+              exit 1
+            fi
+          done
+
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 644 "$HOME/.ssh/known_hosts"
+
+          eval "$(ssh-agent -s)" >/dev/null
+          trap 'ssh-agent -k >/dev/null 2>&1 || true' EXIT
+          ssh-add - <<< "$DEPLOY_SSH_KEY" >/dev/null 2>&1
+
+          ssh -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+              "${DEPLOY_USER}@${DEPLOY_HOST}" \
+              "cd ~/omega-pulse && git fetch origin main && git checkout main && git pull --ff-only origin main && DEPLOY_TRIGGERED_BY='${ACTOR}' bash deploy/deploy.sh deploy/prod.env '${IMAGE}'"
+

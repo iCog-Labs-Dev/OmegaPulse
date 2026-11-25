@@ -14,4 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Visible application version in the page footer for authenticated operators.
 - Automated CI workflow `pulse-build.yml` with reusable test execution and GHCR package publishing for `main`.
 - Server deployment script `deploy/deploy.sh` with config validation, `/healthz` verification, automatic rollback, backup pruning, Caddy startup, and deployment logging.
+- Automatic staging deployment job (`deploy-staging`) in `pulse-build.yml` using pinned SSH host keys and environment concurrency.
+- Tagged release and production deployment workflow (`pulse-release.yml`) with SemVer, `main`-ancestor, GHCR immutability, and changelog checks.
+- Manual rollback / deploy workflow (`pulse-rollback.yml`) and operational documentation in `deploy/README.md`.
 
