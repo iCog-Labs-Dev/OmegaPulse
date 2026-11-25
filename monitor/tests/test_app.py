@@ -317,3 +317,32 @@ def test_upgrade_retires_legacy_anonymous_rows_and_preserves_signed_cookies(setu
     assert upgraded.session(authenticated)['username'] == 'alice'
     with upgraded.connection() as db:
         assert db.execute('SELECT count(*) FROM sessions WHERE username IS NULL').fetchone()[0] == 0
+
+
+def test_healthz_endpoint_is_unauthenticated_and_returns_status_and_version(setup):
+    _, client, _, _, _ = setup
+    response = client.get('/healthz')
+    assert response.status_code == 200
+    assert response.is_json
+    data = response.get_json()
+    assert data == {'status': 'ok', 'version': '0.1.0-dev'}
+    assert set(data.keys()) == {'status', 'version'}
+
+
+def test_healthz_reflects_custom_configured_version(tmp_path):
+    store = AuthStore(tmp_path / 'auth.db')
+    store.add_user('alice', 'a-long-test-password', 'viewer')
+    app = create_app(MonitorConfig(auth_db=store.path, pulse_version='1.2.0'), FakeBackend(), auth_store=store)
+    client = app.test_client()
+    response = client.get('/healthz')
+    assert response.status_code == 200
+    assert response.get_json() == {'status': 'ok', 'version': '1.2.0'}
+
+
+def test_footer_displays_version_for_authenticated_users(setup):
+    _, client, _, _, _ = setup
+    assert client.get('/').status_code == 303
+    assert login(client).status_code == 200
+    page = client.get('/').get_data(as_text=True)
+    assert 'Pulse v0.1.0-dev' in page
+

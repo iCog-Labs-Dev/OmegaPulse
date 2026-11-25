@@ -1,0 +1,71 @@
+name: Pulse build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test:
+    name: Run test suite
+    uses: ./.github/workflows/monitor-tests.yml
+
+  build:
+    name: Build container image
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute version and image tags
+        id: meta
+        run: |
+          VERSION="$(bash deploy/version.sh)"
+          SHORT_SHA="$(git rev-parse --short HEAD)"
+          REPO_LOWER="$(echo "${{ github.repository_owner }}/omega-pulse" | tr '[:upper:]' '[:lower:]')"
+          IMAGE="ghcr.io/${REPO_LOWER}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: monitor
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ steps.meta.outputs.image }}:sha-${{ steps.meta.outputs.short_sha }}
+            ${{ steps.meta.outputs.image }}:main
+          build-args: |
+            PULSE_VERSION=${{ steps.meta.outputs.version }}
+            PULSE_REVISION=${{ github.sha }}
+            PULSE_SOURCE=https://github.com/${{ github.repository }}
+          labels: |
+            org.opencontainers.image.title=Omega Pulse
+            org.opencontainers.image.description=Oma container monitor
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
